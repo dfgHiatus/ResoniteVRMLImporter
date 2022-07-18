@@ -8,6 +8,8 @@ using BaseX;
 using CodeX;
 using HarmonyLib;
 using NeosModLoader;
+using System.Linq;
+using System.Diagnostics;
 
 namespace VRMLImporter
 {
@@ -20,69 +22,57 @@ namespace VRMLImporter
         public static ModConfiguration config;
         public override void OnEngineInit()
         {
-            ((Dictionary<AssetClass, List<string>>)typeof(AssetHelper).GetMethod("get_associatedExtensions").Invoke(null, null))[AssetClass.Model].Add(".wrl");
+            // ((Dictionary<AssetClass, List<string>>)typeof(AssetHelper).GetMethod("get_associatedExtensions").Invoke(null, null))[AssetClass.Model].Add(".wrl");
             new Harmony("net.dfgHiatus.VRMLImporter").PatchAll();
             config = GetConfiguration();
         }
 
         // Check ImportModelAsync
-        [HarmonyPatch(typeof(ModelImporter), "ImportModel")]
+        [HarmonyPatch(typeof(ModelPreimporter), "Preimport")]
         public class FileImporterPatch
         {
-            // TODO: Is file passed as relative or absolute?
-            public static bool Prefix(string file, ref Task __result, Slot targetSlot, ModelImportSettings settings, Slot assetsSlot = null, IProgressIndicator progressIndicator = null)
+            public static void Prefix(ref string __result, string model, string tempPath)
             {
-                Uri uriRaw = new Uri(file);
-                if (!Uri.IsWellFormedUriString(file, UriKind.RelativeOrAbsolute))
+                string normalizedExtension = Path.GetExtension(model).Replace(".", "").ToLower();
+                if (FreeCADInterface.IsAvailable && FreeCADInterface.SupportedFormats.Contains(normalizedExtension))
                 {
-                    throw new ArgumentException($"Provided file path {file} was invalid for .wrl import.");
+                    string cad = Path.Combine(tempPath, Path.ChangeExtension(Path.GetTempFileName(), "obj"));
+                    FreeCADInterface.Tesselate(model, cad, 0.5f);
+                    __result = cad;
                 }
-
-                string uriConverted = null;
-                if (uriRaw.Scheme == "file" && string.Equals(Path.GetExtension(file), ".wrl", StringComparison.OrdinalIgnoreCase))
+                if (normalizedExtension == "blend" && BlenderInterface.IsAvailable)
                 {
-                    uriConverted = VRMLConverter(file);
-
+                    string blender = Path.Combine(tempPath, Path.ChangeExtension(Path.GetTempFileName(), "glb"));
+                    BlenderInterface.ExportToGLTF(model, blender);
+                    __result = blender;
                 }
-                else if (uriRaw.Scheme == "http" || uriRaw.Scheme == "https")
+                if (normalizedExtension == "wrl")
                 {
-                    uriConverted = VRMLConverter(file);
+                    var vrml = Path.Combine("nml_mods", "vrml_importer", "vr1tovr2.exe");
+                    if (File.Exists(vrml))
+                    {
+                        // Only convert if VRML 1.0
+                        var raw = Path.Combine(tempPath, model);
+                        using (StreamReader sr = File.OpenText(raw))
+                        {
+                            string s = sr.ReadLine();
+                            if (s.StartsWith("#VRML V1.0"))
+                            {
+                                var converted = string.Format($"{Path.GetFileNameWithoutExtension(model)}2{normalizedExtension}");
+                                Process.Start(new ProcessStartInfo(vrml, string.Format($"{raw} -o {converted}"))
+                                {
+                                    WindowStyle = ProcessWindowStyle.Hidden
+                                }).WaitForExit();
+                                __result = converted;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        UniLog.Warning("VRML 1-2 Converter was not installed.");
+                    }
                 }
-                /* 
-                TODO: Support neosdb links
-				else if (uri.Scheme == "neosdb")
-                {
-					
-				} 
-                */
-
-                if (uriConverted == null)
-                {
-                    return false;
-                }
-
-                __result = targetSlot.StartTask(async delegate ()
-                {
-                    await default(ToBackground);
-                    LocalDB localDB = targetSlot.World.Engine.LocalDB;
-                    await localDB.ImportLocalAssetAsync(uriConverted, LocalDB.ImportLocation.Copy).ConfigureAwait(continueOnCapturedContext: false);
-
-                    await default(ToWorld);
-                    targetSlot.Name = Path.GetFileNameWithoutExtension(uriConverted);
-                    targetSlot.AttachComponent<MeshCollider>();
-                    targetSlot.AttachComponent<ObjectRoot>();
-                    var grab = targetSlot.AttachComponent<Grabbable>();
-                    grab.Scalable.Value = true;
-                });
-
-                return false;
-            }
-
-            // TODO possibly put this onto the background task?
-            private static string VRMLConverter(string file)
-            {
-                Scene.FromFile(file).Save(string.Format(Engine.Current.CachePath, Path.GetFileNameWithoutExtension(file), ".gltf"), FileFormat.GLTF2_Binary);
-                return string.Format(Engine.Current.CachePath, Path.GetFileNameWithoutExtension(file), ".gltf");
+                __result = null;
             }
         }
     }
