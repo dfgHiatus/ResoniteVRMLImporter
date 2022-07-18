@@ -63,7 +63,7 @@ namespace VRMLImporter
                                 {
                                     WindowStyle = ProcessWindowStyle.Hidden
                                 }).WaitForExit();
-                                __result = converted;
+                                __result = Path.Combine(tempPath, converted);
                             }
                         }
                     }
