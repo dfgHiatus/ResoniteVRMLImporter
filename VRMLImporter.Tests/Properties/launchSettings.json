@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "VRMLImporter.Tests": {
+      "commandName": "Project",
+      "workingDirectory": "D:\\Mods\\VRML\\VRMLImporter.Tests"
+    }
+  }
+}
