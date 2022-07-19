@@ -60,14 +60,14 @@ namespace VRMLImporter
                         if (s.StartsWith("#VRML V1.0"))
                         {
                             var convertedModel = $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.wrl";
-                            Process.Start(new ProcessStartInfo(vrmlConverter, string.Format($"{model} {convertedModel}"))
+                            Process.Start(new ProcessStartInfo(vrmlConverter, string.Format($"{model} {Path.Combine(Path.GetDirectoryName(model), convertedModel)}"))
                             {
-                                WindowStyle = ProcessWindowStyle.Normal,
-                                CreateNoWindow = false,
-                                UseShellExecute = false
+                                WindowStyle = ProcessWindowStyle.Hidden,
+                                CreateNoWindow = true,
+                                UseShellExecute = true
                             }).WaitForExit();
 
-                            VRML2ToGLTF(Path.Combine(Path.GetDirectoryName(model), Path.GetFileName(convertedModel)), blenderTarget);
+                            VRML2ToGLTF(Path.Combine(Path.GetDirectoryName(model), convertedModel), blenderTarget);
                             __result = blenderTarget;
                             UniLog.Log("File format - " + blenderTarget);
                             return;
@@ -99,8 +99,8 @@ namespace VRMLImporter
                 blenderArgs = "--disable-autoexec " + blenderArgs;
                 Process.Start(new ProcessStartInfo(BlenderInterface.Executable, blenderArgs)
                 {
-                    WindowStyle = ProcessWindowStyle.Normal,
-                    CreateNoWindow = false,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    CreateNoWindow = true,
                     UseShellExecute = false
                 }).WaitForExit();
                 File.Delete(tempBlenderScript);
