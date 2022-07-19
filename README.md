@@ -10,6 +10,8 @@ A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https
 1. Install and extract [Blender](https://www.blender.org/download/) to your Neos tools folder. This can be found under `C:\Program Files (x86)\Steam\steamapps\common\NeosVR\tools\Blender` for a default install.
 1. Start the game. If you want to verify that the mod is working you can check your Neos logs.
 
+Depending on the size of the file, it may take up to a few minutes to fully import. It's OK if the import dialogue seems to hang on "Preimporting" for a little bit - this is where the bulk of the conversion is done.
+
 ### Credits
 - Thanks to [badhaloninja](https://github.com/badhaloninja) for reflection help
 - Thanks to [Roger Kaufman](http://www.interocitors.com/polyhedra/vr1tovr2/) for their VRML 1.0 to VRML 2.0 converter
