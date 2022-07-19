@@ -11,6 +11,13 @@ namespace VRMLImporter.Tests
             {
                 string s = sr.ReadLine() ?? throw new ArgumentException("File was empty");
 
+                var vrmlConverter = Path.Combine("vrml_importer", "vrml1tovrml2.exe");
+                if (!File.Exists(vrmlConverter))
+                {
+                    Console.WriteLine("VRML v1-v2 Converter was not installed.");
+                    return;
+                }
+
                 if (s.StartsWith("#VRML V1.0"))
                 {
                     var time = DateTime.Now.Ticks.ToString();
