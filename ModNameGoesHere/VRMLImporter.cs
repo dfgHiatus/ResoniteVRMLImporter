@@ -31,74 +31,56 @@ namespace VRMLImporter
         {
             var aExt = Traverse.Create(typeof(AssetHelper)).Field<Dictionary<AssetClass, List<string>>>("associatedExtensions");
             aExt.Value[AssetClass.Model].Add("wrl");
-        } 
+        }
 
         [HarmonyPatch(typeof(ModelPreimporter), "Preimport")]
         public class FileImporterPatch
         {
-            public static void Prefix(ref string __result, string model, string tempPath)
+            public static void Postfix(ref string __result, string model, string tempPath)
             {
+                UniLog.Log("Model - " + model);
+                UniLog.Log("tempPath - " + tempPath);
+
                 string normalizedExtension = Path.GetExtension(model).Replace(".", "").ToLower();
-                if (FreeCADInterface.IsAvailable && FreeCADInterface.SupportedFormats.Contains(normalizedExtension))
-                {
-                    string cadTarget = Path.Combine(tempPath, Path.ChangeExtension(Path.GetTempFileName(), "obj"));
-                    FreeCADInterface.Tesselate(model, cadTarget, 0.5f);
-                    __result = cadTarget;
-                    return;
-                }
-                else if (normalizedExtension == "blend" && BlenderInterface.IsAvailable)
-                {
-                    string blenderTarget = Path.Combine(tempPath, Path.ChangeExtension(Path.GetTempFileName(), "glb"));
-                    BlenderInterface.ExportToGLTF(model, blenderTarget);
-                    __result = blenderTarget;
-                    return;
-                }
-                else if (normalizedExtension == "wrl" && BlenderInterface.IsAvailable)
+                if (normalizedExtension == "wrl" && BlenderInterface.IsAvailable)
                 {
                     var vrmlConverter = Path.Combine("nml_mods", "vrml_importer", "vrml1tovrml2.exe");
                     if (!File.Exists(vrmlConverter))
                     {
                         UniLog.Warning("VRML v1-v2 Converter was not installed.");
-                        __result = null;
                         return;
                     }
 
                     // Only convert if VRML 1.0
-                    string blenderTarget = Path.Combine(tempPath, Path.ChangeExtension(Path.GetTempFileName(), "glb"));
-                    var rawVRMLwithPath = Path.Combine(tempPath, model);
-                    using (StreamReader sr = File.OpenText(rawVRMLwithPath))
+                    var time = DateTime.Now.Ticks.ToString();
+                    string blenderTarget = Path.Combine(Path.GetDirectoryName(model), $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
+                    using (StreamReader sr = File.OpenText(model))
                     {
                         string s = sr.ReadLine();
                         if (s.StartsWith("#VRML V1.0"))
                         {
-                            var time = DateTime.Now.Ticks.ToString();
-                            string converted_v2 = string.Format($"{Path.GetFileNameWithoutExtension(model)}_v2_{time}{normalizedExtension}"); //.wrl
-                            Process.Start(new ProcessStartInfo(vrmlConverter, string.Format($"{rawVRMLwithPath} {converted_v2}"))
+                            var convertedModel = $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.wrl";
+                            Process.Start(new ProcessStartInfo(vrmlConverter, string.Format($"{model} {convertedModel}"))
                             {
                                 WindowStyle = ProcessWindowStyle.Normal,
                                 CreateNoWindow = false,
                                 UseShellExecute = false
                             }).WaitForExit();
 
-                            VRML2ToGLTF(Path.Combine(tempPath, converted_v2), blenderTarget);
+                            VRML2ToGLTF(Path.Combine(Path.GetDirectoryName(model), Path.GetFileName(convertedModel)), blenderTarget);
                             __result = blenderTarget;
                             UniLog.Log("File format - " + blenderTarget);
                             return;
                         }
                         else if (s.StartsWith("#VRML V2.0"))
                         {
-                            VRML2ToGLTF(Path.Combine(tempPath, Path.ChangeExtension(Path.GetTempFileName(), "glb")), blenderTarget);
+                            VRML2ToGLTF(model, blenderTarget);
                             UniLog.Log("File format - " + blenderTarget);
                             __result = blenderTarget;
                             return;
                         }
                     }
                 }
-                else
-                {
-                    __result = null;
-                }
-                
             }
 
             private static void VRML2ToGLTF(string input, string output)
