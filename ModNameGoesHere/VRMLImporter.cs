@@ -31,6 +31,7 @@ namespace VRMLImporter
         {
             var aExt = Traverse.Create(typeof(AssetHelper)).Field<Dictionary<AssetClass, List<string>>>("associatedExtensions");
             aExt.Value[AssetClass.Model].Add("wrl");
+            aExt.Value[AssetClass.Model].Add("x3d");
         }
 
         [HarmonyPatch(typeof(ModelPreimporter), "Preimport")]
@@ -38,9 +39,6 @@ namespace VRMLImporter
         {
             public static void Postfix(ref string __result, string model, string tempPath)
             {
-                UniLog.Log("Model - " + model);
-                UniLog.Log("tempPath - " + tempPath);
-
                 string normalizedExtension = Path.GetExtension(model).Replace(".", "").ToLower();
                 if (normalizedExtension == "wrl" && BlenderInterface.IsAvailable)
                 {
@@ -67,27 +65,31 @@ namespace VRMLImporter
                                 UseShellExecute = true
                             }).WaitForExit();
 
-                            VRML2ToGLTF(Path.Combine(Path.GetDirectoryName(model), convertedModel), blenderTarget);
+                            ConvertToGLTF(Path.Combine(Path.GetDirectoryName(model), convertedModel), blenderTarget);
                             __result = blenderTarget;
-                            UniLog.Log("File format - " + blenderTarget);
                             return;
                         }
                         else if (s.StartsWith("#VRML V2.0"))
                         {
-                            VRML2ToGLTF(model, blenderTarget);
-                            UniLog.Log("File format - " + blenderTarget);
+                            ConvertToGLTF(model, blenderTarget);
                             __result = blenderTarget;
                             return;
                         }
                     }
                 }
+                else if (normalizedExtension == "x3d" && BlenderInterface.IsAvailable)
+                {
+                    var time = DateTime.Now.Ticks.ToString();
+                    string blenderTarget = Path.Combine(Path.GetDirectoryName(model), $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
+                    ConvertToGLTF(model, blenderTarget);
+                    __result = blenderTarget;
+                    return;
+                }
             }
 
-            private static void VRML2ToGLTF(string input, string output)
+            private static void ConvertToGLTF(string input, string output)
             {
                 // TODO Check if escaping the output path is neccesary for linux
-                UniLog.Log("File input - " + input);
-                UniLog.Log("File output - " + output);
                 RunBlenderScript($"import bpy\nbpy.ops.import_scene.x3d(filepath = '{input}')\nbpy.ops.export_scene.gltf(filepath = '{output}')");
             }
 
