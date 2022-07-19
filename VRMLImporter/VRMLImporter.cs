@@ -1,15 +1,12 @@
 ﻿using System;
 using System.IO;
+using System.Diagnostics;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using Aspose.ThreeD;
 using FrooxEngine;
 using BaseX;
 using CodeX;
 using HarmonyLib;
 using NeosModLoader;
-using System.Linq;
-using System.Diagnostics;
 
 namespace VRMLImporter
 {
