@@ -11,4 +11,4 @@ A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https
 
 ### Credits
 - Thanks to [badhaloninja](https://github.com/badhaloninja) for reflection help
-- Thanks to Roger Kaufman for their VRML 1.0 to VRML 2.0 converter
+- Thanks to [Roger Kaufman](http://www.interocitors.com/polyhedra/vr1tovr2/) for their VRML 1.0 to VRML 2.0 converter
