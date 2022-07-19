@@ -1,5 +1,6 @@
 #  NeosVRMLImporter
 
+![VRML](https://user-images.githubusercontent.com/51272212/179760003-51301efc-8bc9-4936-aad4-6421bf7160b5.PNG)
 
 A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https://neos.com/) that enables the import of VRML 1.0, VRML 2.0 and X3D 3D models.
 
