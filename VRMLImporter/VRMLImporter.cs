@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Diagnostics;
 using System.Collections.Generic;
 using FrooxEngine;
@@ -36,39 +37,46 @@ namespace VRMLImporter
         {
             public static void Postfix(ref string __result, string model, string tempPath)
             {
-                string normalizedExtension = Path.GetExtension(model).Replace(".", "").ToLower();
+                var modelName = Path.GetFileNameWithoutExtension(model);
+                if (ContainsUnicodeCharacter(modelName))
+                {
+                    throw new ArgumentException("Imported model cannot have unicode characters in its file name.");
+                }
+
+                var normalizedExtension = Path.GetExtension(model).Replace(".", "").ToLower();
+                var trueCachePath = Path.Combine(Engine.Current.CachePath, "Cache");
+                var time = DateTime.Now.Ticks.ToString();
+
                 if (normalizedExtension == "wrl" && BlenderInterface.IsAvailable)
                 {
                     var vrmlConverter = Path.Combine("nml_mods", "vrml_importer", "vrml1tovrml2.exe");
                     if (!File.Exists(vrmlConverter))
                     {
-                        UniLog.Warning("VRML v1-v2 Converter was not installed.");
-                        return;
+                        throw new InvalidOperationException("VRML v1-v2 Converter was not installed.");
                     }
 
                     // Only convert if VRML 1.0
-                    var time = DateTime.Now.Ticks.ToString();
-                    string blenderTarget = Path.Combine(Path.GetDirectoryName(model), $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
+                    var blenderTarget = Path.Combine(trueCachePath, $"{modelName}_v2_{time}.glb");
                     using (StreamReader sr = File.OpenText(model))
                     {
                         string s = sr.ReadLine();
                         if (s.StartsWith("#VRML V1.0"))
                         {
-                            var convertedModel = $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.wrl";
-                            Process.Start(new ProcessStartInfo(vrmlConverter, string.Format($"{model} {Path.Combine(Path.GetDirectoryName(model), convertedModel)}"))
+                            var convertedModel = $"{modelName}_v2_{time}.wrl";
+                            Process.Start(new ProcessStartInfo(vrmlConverter, string.Format($"{model} {Path.Combine(trueCachePath, convertedModel)}"))
                             {
                                 WindowStyle = ProcessWindowStyle.Hidden,
                                 CreateNoWindow = true,
                                 UseShellExecute = true
                             }).WaitForExit();
 
-                            ConvertToGLTF(Path.Combine(Path.GetDirectoryName(model), convertedModel), blenderTarget);
+                            VRMLToGLTF(Path.Combine(trueCachePath, convertedModel), blenderTarget);
                             __result = blenderTarget;
                             return;
                         }
                         else if (s.StartsWith("#VRML V2.0"))
                         {
-                            ConvertToGLTF(model, blenderTarget);
+                            VRMLToGLTF(model, blenderTarget);
                             __result = blenderTarget;
                             return;
                         }
@@ -76,25 +84,36 @@ namespace VRMLImporter
                 }
                 else if (normalizedExtension == "x3d" && BlenderInterface.IsAvailable)
                 {
-                    var time = DateTime.Now.Ticks.ToString();
-                    string blenderTarget = Path.Combine(Path.GetDirectoryName(model), $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
-                    ConvertToGLTF(model, blenderTarget);
+                    var blenderTarget = Path.Combine(trueCachePath, $"{modelName}_v2_{time}.glb");
+                    X3DToGLTF(model, blenderTarget);
                     __result = blenderTarget;
                     return;
                 }
             }
 
-            private static void ConvertToGLTF(string input, string output)
+            private static bool ContainsUnicodeCharacter(string input)
             {
-                // TODO Check if escaping the output path is neccesary for linux
+                const int MaxAnsiCode = 255;
+                return input.Any(c => c > MaxAnsiCode);
+            }
+
+            private static void VRMLToGLTF(string input, string output)
+            {
                 RunBlenderScript($"import bpy\nbpy.ops.import_scene.x3d(filepath = '{input}')\nbpy.ops.export_scene.gltf(filepath = '{output}')");
+            }
+
+            private static void X3DToGLTF(string input, string output)
+            {
+                // This is ridiculous. This only occurs when importing X3Ds, the only reason this works is because Blender renames submeshes on import to Shape_IndexedFaceSet.XXX
+                // Someone, break this please so I have a reason to improve it
+                RunBlenderScript($"import bpy\nbpy.ops.import_scene.x3d(filepath = '{input}')\nobjs = bpy.data.objects\ntry:\n  objs.remove(objs['Cube'], do_unlink = True)\nexcept:\n  pass\nbpy.ops.export_scene.gltf(filepath = '{output}')");
             }
 
             private static void RunBlenderScript(string script, string arguments = "-b -P \"{0}\"")
             {
-                string tempBlenderScript = Path.Combine(Path.GetTempPath(), Path.GetTempFileName() + ".py");
+                var tempBlenderScript = Path.Combine(Path.GetTempPath(), Path.GetTempFileName() + ".py");
                 File.WriteAllText(tempBlenderScript, script);
-                string blenderArgs = string.Format(arguments, tempBlenderScript);
+                var blenderArgs = string.Format(arguments, tempBlenderScript);
                 blenderArgs = "--disable-autoexec " + blenderArgs;
                 Process.Start(new ProcessStartInfo(BlenderInterface.Executable, blenderArgs)
                 {
