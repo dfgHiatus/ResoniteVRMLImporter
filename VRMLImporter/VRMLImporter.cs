@@ -7,6 +7,7 @@ using BaseX;
 using CodeX;
 using HarmonyLib;
 using NeosModLoader;
+using Aspose.ThreeD;
 
 namespace VRMLImporter
 {
@@ -37,47 +38,21 @@ namespace VRMLImporter
             public static void Postfix(ref string __result, string model, string tempPath)
             {
                 string normalizedExtension = Path.GetExtension(model).Replace(".", "").ToLower();
-                if (normalizedExtension == "wrl" && BlenderInterface.IsAvailable)
+                if (normalizedExtension == "wrl")
                 {
-                    var vrmlConverter = Path.Combine("nml_mods", "vrml_importer", "vrml1tovrml2.exe");
-                    if (!File.Exists(vrmlConverter))
-                    {
-                        UniLog.Warning("VRML v1-v2 Converter was not installed.");
-                        return;
-                    }
-
-                    // Only convert if VRML 1.0
+                    Scene scene = new Scene();
+                    scene.Open(model);
                     var time = DateTime.Now.Ticks.ToString();
-                    string blenderTarget = Path.Combine(Path.GetDirectoryName(model), $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
-                    using (StreamReader sr = File.OpenText(model))
-                    {
-                        string s = sr.ReadLine();
-                        if (s.StartsWith("#VRML V1.0"))
-                        {
-                            var convertedModel = $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.wrl";
-                            Process.Start(new ProcessStartInfo(vrmlConverter, string.Format($"{model} {Path.Combine(Path.GetDirectoryName(model), convertedModel)}"))
-                            {
-                                WindowStyle = ProcessWindowStyle.Hidden,
-                                CreateNoWindow = true,
-                                UseShellExecute = true
-                            }).WaitForExit();
-
-                            ConvertToGLTF(Path.Combine(Path.GetDirectoryName(model), convertedModel), blenderTarget);
-                            __result = blenderTarget;
-                            return;
-                        }
-                        else if (s.StartsWith("#VRML V2.0"))
-                        {
-                            ConvertToGLTF(model, blenderTarget);
-                            __result = blenderTarget;
-                            return;
-                        }
-                    }
+                    var aspose = Path.Combine(Path.GetDirectoryName(model), $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
+                    var asposePath = Path.Combine(Engine.Current.CachePath, aspose);
+                    scene.Save(asposePath);
+                    __result = asposePath;
+                    return;
                 }
                 else if (normalizedExtension == "x3d" && BlenderInterface.IsAvailable)
                 {
                     var time = DateTime.Now.Ticks.ToString();
-                    string blenderTarget = Path.Combine(Path.GetDirectoryName(model), $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
+                    var blenderTarget = Path.Combine(Path.GetDirectoryName(model), $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
                     ConvertToGLTF(model, blenderTarget);
                     __result = blenderTarget;
                     return;
