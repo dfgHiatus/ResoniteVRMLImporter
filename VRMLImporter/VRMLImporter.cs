@@ -52,7 +52,7 @@ namespace VRMLImporter
                 else if (normalizedExtension == "x3d" && BlenderInterface.IsAvailable)
                 {
                     var time = DateTime.Now.Ticks.ToString();
-                    var blenderTarget = Path.Combine(Path.GetDirectoryName(model), $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
+                    var blenderTarget = Path.Combine(Engine.Current.CachePath, $"{Path.GetFileNameWithoutExtension(model)}_v2_{time}.glb");
                     ConvertToGLTF(model, blenderTarget);
                     __result = blenderTarget;
                     return;
