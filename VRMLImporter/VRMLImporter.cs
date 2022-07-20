@@ -52,7 +52,7 @@ namespace VRMLImporter
                     var vrmlConverter = Path.Combine("nml_mods", "vrml_importer", "vrml1tovrml2.exe");
                     if (!File.Exists(vrmlConverter))
                     {
-                        throw new InvalidOperationException("VRML v1-v2 Converter was not installed.");
+                        throw new FileNotFoundException("VRML v1-v2 Converter was not installed.");
                     }
 
                     // Only convert if VRML 1.0
