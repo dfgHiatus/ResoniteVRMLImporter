@@ -15,22 +15,63 @@ public class VRMLImporter : ResoniteMod
 {
     public override string Name => "VRMLImporter";
     public override string Author => "dfgHiatus";
-    public override string Version => "2.0.0";
+    public override string Version => "2.0.1";
     public override string Link => "https://github.com/dfgHiatus/ResoniteVRMLmporter/";
+
     public static ModConfiguration config;
+
     public override void OnEngineInit()
     {
         new Harmony("net.dfgHiatus.VRMLImporter").PatchAll();
         config = GetConfiguration();
-        Engine.Current.RunPostInit(() => AssetPatch());
+        Engine.Current.RunPostInit(() =>
+        {
+            AssetPatch("wrl");
+            AssetPatch("x3d");
+        });
     }
 
-    public static void AssetPatch()
+
+    private void AssetPatch(string extension)
     {
-        var aExt = Traverse.Create(typeof(AssetHelper)).Field<Dictionary<AssetClass, List<string>>>("associatedExtensions");
-        aExt.Value[AssetClass.Model].Add("wrl");
-        aExt.Value[AssetClass.Model].Add("x3d");
+        // Get ImportExtension type via reflection since it's now a struct inside AssetHelper
+        var assHelperType = typeof(AssetHelper);
+        var importExtType = assHelperType.GetNestedType("ImportExtension",
+            System.Reflection.BindingFlags.NonPublic);
+
+        if (importExtType == null)
+        {
+            return;
+        }
+
+        // Create an ImportExtension instance with reflection
+        // Constructor args: (string ext, bool autoImport)
+        var importExt = System.Activator.CreateInstance(importExtType,
+            new object[] { extension, true });
+
+        // Get the associatedExtensions field via reflection
+        var extensionsField = assHelperType.GetField("associatedExtensions",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+        if (extensionsField == null)
+        {
+            return;
+        }
+
+        // Get the dictionary and add our extension to the Special asset class
+        var extensions = extensionsField.GetValue(null);
+        var dictType = extensions.GetType();
+        var specialValue = dictType.GetMethod("get_Item").Invoke(extensions, new object[] { AssetClass.Special });
+
+        if (specialValue == null)
+        {
+            return;
+        }
+
+        // Add our ImportExtension to the list
+        specialValue.GetType().GetMethod("Add").Invoke(specialValue, new[] { importExt }); 
     }
+
 
     [HarmonyPatch(typeof(ModelPreimporter), "Preimport")]
     public class FileImporterPatch
